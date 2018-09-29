@@ -8,10 +8,10 @@ type Item {
   id: ID! @unique
   title: String!
   description: String!
-  image: String!
-  largeImage: String!
-  price
-  createAt
-  updatedAt
-  user
+  image: String
+  largeImage: String
+  price: Int!
+  # createdAt: DateTime!
+  # updatedAt: DateTime!
+  # user: User!
 }

@@ -17,6 +17,7 @@ const SingleItemStyles = styled.div`
     width: 100%;
     height: 100%;
     object-fit: contain;
+    padding: 3rem;
   }
   .details {
     margin: 3rem;
@@ -48,16 +49,17 @@ class SingleItem extends Component {
           if (error) return <Error error={error} />;
           if (loading) return <p>Loading...</p>;
           if (!data.item) return <p>No Item Found for {this.props.id}</p>;
-          const item = data.item;
+
+          const { title, largeImage, description } = data.item;
           return (
             <SingleItemStyles>
               <Head>
-                <title>Sick Fits | {item.title}</title>
+                <title>Sick Fits | {title}</title>
               </Head>
-              <img src={item.largeImage} alt={item.title} />
+              <img src={largeImage} alt={title} />
               <div className="details">
-                <h2>Viewing {item.title}</h2>
-                <p>{item.description}</p>
+                <h2>{title}</h2>
+                <p>{description}</p>
               </div>
             </SingleItemStyles>
           );

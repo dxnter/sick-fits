@@ -4,6 +4,7 @@ const { randomBytes } = require('crypto');
 const { promisify } = require('util');
 const { transport, makeANiceEmail } = require('../mail');
 const { hasPermission } = require('../utils');
+const stripe = require('../stripe');
 
 const Mutations = {
   async createItem(parent, args, ctx, info) {
@@ -17,11 +18,11 @@ const Mutations = {
           // Relationship between the Item and User
           user: {
             connect: {
-              id: ctx.request.userId,
-            },
+              id: ctx.request.userId
+            }
           },
-          ...args,
-        },
+          ...args
+        }
       },
       info
     );
@@ -38,8 +39,8 @@ const Mutations = {
       {
         data: updates,
         where: {
-          id: args.id,
-        },
+          id: args.id
+        }
       },
       info
     );
@@ -72,8 +73,8 @@ const Mutations = {
         data: {
           ...args,
           password,
-          permissions: { set: ['USER'] },
-        },
+          permissions: { set: ['USER'] }
+        }
       },
       info
     );
@@ -82,7 +83,7 @@ const Mutations = {
     // Set the JWT as a cooke on the response
     ctx.response.cookie('token', token, {
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 365,
+      maxAge: 1000 * 60 * 60 * 24 * 365
     });
     // Return the user to the browser
     return user;
@@ -104,7 +105,7 @@ const Mutations = {
     // Set the cookie with the token
     ctx.response.cookie('token', token, {
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 365,
+      maxAge: 1000 * 60 * 60 * 24 * 365
     });
     // Return the user
     return user;
@@ -126,7 +127,7 @@ const Mutations = {
     const resetTokenExpiry = Date.now() + 3600000; // 1 hour from now
     const response = await ctx.db.mutation.updateUser({
       where: { email },
-      data: { resetToken, resetTokenExpiry },
+      data: { resetToken, resetTokenExpiry }
     });
     // Email them that reset token
     const mailRes = await transport.sendMail({
@@ -137,7 +138,7 @@ const Mutations = {
         `Your Password Reset Token is here! \n\n <a href="${
           process.env.FRONTEND_URL
         }/reset?resetToken=${resetToken}">Click Here To Reset</a>`
-      ),
+      )
     });
     // Return the message
     return { message: 'Thanks' };
@@ -153,8 +154,8 @@ const Mutations = {
     const [user] = await ctx.db.query.users({
       where: {
         resetToken: args.resetToken,
-        resetTokenExpiry_gte: Date.now() - 3600000,
-      },
+        resetTokenExpiry_gte: Date.now() - 3600000
+      }
     });
     if (!user) {
       throw new Error('This token is either invalid or expired');
@@ -164,14 +165,14 @@ const Mutations = {
     // Save the new password to the user and remove old reset token fields
     const updatedUser = await ctx.db.mutation.updateUser({
       where: { email: user.email },
-      data: { password, resetToken: null, resetTokenExpiry: null },
+      data: { password, resetToken: null, resetTokenExpiry: null }
     });
     // Generate JWT
     const token = jwt.sign({ userId: updatedUser.id }, process.env.APP_SECRET);
     // Set the JWT cookie
     ctx.response.cookie('token', token, {
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 365,
+      maxAge: 1000 * 60 * 60 * 24 * 365
     });
     // Return the new user
     return updatedUser;
@@ -182,7 +183,10 @@ const Mutations = {
       throw new Error('You must be logged in!');
     }
     // Query the current user
-    const currentUser = await ctx.db.query.user({ where: { id: ctx.request.userId } }, info);
+    const currentUser = await ctx.db.query.user(
+      { where: { id: ctx.request.userId } },
+      info
+    );
     // Check if they have permissions to do this
     hasPermission(currentUser, ['ADMIN', 'PERMISSIONUPDATE']);
     // Update the permissions
@@ -190,12 +194,12 @@ const Mutations = {
       {
         data: {
           permissions: {
-            set: args.permissions,
-          },
+            set: args.permissions
+          }
         },
         where: {
-          id: args.userId,
-        },
+          id: args.userId
+        }
       },
       info
     );
@@ -210,15 +214,15 @@ const Mutations = {
     const [existingCartItem] = await ctx.db.query.cartItems({
       where: {
         user: { id: userId },
-        item: { id: args.id },
-      },
+        item: { id: args.id }
+      }
     });
     // Check if that item is already in their cart and increment by one if it is
     if (existingCartItem) {
       return ctx.db.mutation.updateCartItem(
         {
           where: { id: existingCartItem.id },
-          data: { quantity: existingCartItem.quantity + 1 },
+          data: { quantity: existingCartItem.quantity + 1 }
         },
         info
       );
@@ -228,12 +232,12 @@ const Mutations = {
       {
         data: {
           user: {
-            connect: { id: userId },
+            connect: { id: userId }
           },
           item: {
-            connect: { id: args.id },
-          },
-        },
+            connect: { id: args.id }
+          }
+        }
       },
       info
     );
@@ -242,7 +246,7 @@ const Mutations = {
     // Find the cart item'
     const cartItem = await ctx.db.query.cartItem(
       {
-        where: { id: args.id },
+        where: { id: args.id }
       },
       `{ id, user { id }}`
     );
@@ -255,11 +259,70 @@ const Mutations = {
     // Delete that cart item
     return ctx.db.mutation.deleteCartItem(
       {
-        where: { id: args.id },
+        where: { id: args.id }
       },
       info
     );
   },
+  async createOrder(parent, args, ctx, info) {
+    // 1. Query the current user and make sure they are signed in
+    const { userId } = ctx.request;
+    if (!userId)
+      throw new Error('You must be signed in to complete this order.');
+    const user = await ctx.db.query.user(
+      { where: { id: userId } },
+      `{
+      id
+      name
+      email
+      cart {
+        id
+        quantity
+        item { title price id description image largeImage }
+      }}`
+    );
+    // 2. recalculate the total for the price
+    const amount = user.cart.reduce(
+      (tally, cartItem) => tally + cartItem.item.price * cartItem.quantity,
+      0
+    );
+    console.log(`Going to charge for a total of ${amount}`);
+    // 3. Create the stripe charge (turn token into $$$)
+    const charge = await stripe.charges.create({
+      amount,
+      currency: 'USD',
+      source: args.token
+    });
+    // 4. Convert the CartItems to OrderItems
+    const orderItems = user.cart.map(cartItem => {
+      const orderItem = {
+        ...cartItem.item,
+        quantity: cartItem.quantity,
+        user: { connect: { id: userId } }
+      };
+      delete orderItem.id;
+      return orderItem;
+    });
+
+    // 5. create the Order
+    const order = await ctx.db.mutation.createOrder({
+      data: {
+        total: charge.amount,
+        charge: charge.id,
+        items: { create: orderItems },
+        user: { connect: { id: userId } }
+      }
+    });
+    // 6. Clean up - clear the users cart, delete cartItems
+    const cartItemIds = user.cart.map(cartItem => cartItem.id);
+    await ctx.db.mutation.deleteManyCartItems({
+      where: {
+        id_in: cartItemIds
+      }
+    });
+    // 7. Return the Order to the client
+    return order;
+  }
 };
 
 module.exports = Mutations;

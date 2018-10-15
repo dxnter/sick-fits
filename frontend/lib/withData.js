@@ -9,7 +9,8 @@ function createClient({ headers }) {
     request: operation => {
       operation.setContext({
         fetchOptions: {
-          credentials: 'include'
+          credentials: 'include',
+          origin: process.env.FRONTEND_URL
         },
         headers
       });

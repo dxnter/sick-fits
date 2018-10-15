@@ -25,7 +25,7 @@ const BigButton = styled.button`
 
 class RemoveFromCart extends React.Component {
   static propTypes = {
-    id: PropTypes.string.isRequired,
+    id: PropTypes.string.isRequired
   };
 
   // Gets called as soon as we get a response back from the server
@@ -49,8 +49,8 @@ class RemoveFromCart extends React.Component {
           __typename: 'Mutation',
           removeFromCart: {
             __typename: 'CartItem',
-            id: this.props.id,
-          },
+            id: this.props.id
+          }
         }}
       >
         {(removeFromCart, { loading, error }) => (
@@ -70,3 +70,4 @@ class RemoveFromCart extends React.Component {
 }
 
 export default RemoveFromCart;
+export { REMOVE_FROM_CART_MUTATION };

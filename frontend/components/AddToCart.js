@@ -16,9 +16,18 @@ class AddToCart extends React.Component {
   render() {
     const { id } = this.props;
     return (
-      <Mutation mutation={ADD_TO_CART_MUTATION} variables={{ id }} refetchQueries={[{ query: CURRENT_USER_QUERY }]}>
+      <Mutation
+        mutation={ADD_TO_CART_MUTATION}
+        variables={{ id }}
+        refetchQueries={[{ query: CURRENT_USER_QUERY }]}
+      >
         {(addToCart, { loading }) => (
-          <button onClick={addToCart} disabled={loading} type="button" style={{ cursor: 'pointer' }}>
+          <button
+            onClick={addToCart}
+            disabled={loading}
+            type="button"
+            style={{ cursor: 'pointer' }}
+          >
             Add
             {loading && 'ing'} To Cart 🛒
           </button>
@@ -29,3 +38,4 @@ class AddToCart extends React.Component {
 }
 
 export default AddToCart;
+export { ADD_TO_CART_MUTATION };
